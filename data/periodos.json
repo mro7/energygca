@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1770211388545",
+    "nombre": "012026",
+    "porcentajeContribucion": 0.2,
+    "costoUnitario": 600,
+    "fechaInicio": "2026-02-01",
+    "fechaFin": "2026-02-28",
+    "diasFacturados": 28,
+    "consumoTotal": 0
+  },
+  {
+    "id": "1768918308904",
+    "nombre": "122025",
+    "porcentajeContribucion": 0.2,
+    "costoUnitario": 665.514,
+    "fechaInicio": "2025-12-01",
+    "fechaFin": "2025-12-31",
+    "diasFacturados": 31,
+    "consumoTotal": 57728.22510000001
+  }
+]

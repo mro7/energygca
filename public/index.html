@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Granabastos E-Track</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="bg-slate-50">
+    <!-- PANTALLA DE LOGIN -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800">
+      <div class="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md">
+        <div class="text-center mb-8">
+          <i class="fas fa-bolt text-blue-600 text-5xl mb-4"></i>
+          <h1 class="text-3xl font-bold text-slate-800">Granabastos E-Track</h1>
+          <p class="text-slate-500 mt-2">Sistema de Seguimiento de Energía</p>
+        </div>
+        <form id="form-login" class="space-y-6">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Usuario</label>
+            <input type="text" id="login-username" required class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">Contraseña</label>
+            <input type="password" id="login-password" required class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+          </div>
+          <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl"><i class="fas fa-sign-in-alt mr-2"></i>Iniciar Sesión</button>
+        </form>
+
+        <!-- SECCIÓN DE CONSULTA PÚBLICA -->
+        <div class="mt-10 pt-8 border-t border-slate-100">
+          <h2 class="text-lg font-bold text-slate-800 mb-4 text-center">Consulta de Consumo</h2>
+          <div class="flex gap-2">
+            <input type="text" id="public-query-code" placeholder="Código de Cliente" class="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            <button onclick="consultarClientePublico()" class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-all">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
+          <p class="text-xs text-slate-500 mt-2 text-center">Ingrese su código para ver histórico y consumos.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- APLICACIÓN PRINCIPAL -->
+    <div id="main-app" class="hidden">
+      <!-- HEADER -->
+      <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container-wide py-4 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <i class="fas fa-bolt text-blue-600 text-3xl"></i>
+            <h1 class="text-2xl font-bold text-slate-800">Granabastos E-Track</h1>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- Botón configuración solo icono -->
+            <button onclick="openModal('modal-config')" class="flex items-center justify-center w-12 h-10 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-all shadow-md hover:shadow-lg" title="Configuración">
+              <i class="fas fa-cog text-xl"></i>
+            </button>
+            <!-- Botón salir -->
+            <button onclick="logout()" class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md hover:shadow-lg">
+              <i class="fas fa-sign-out-alt"></i>
+              <span class="font-semibold">Salir</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- NAVEGACIÓN -->
+      <nav class="nav-bar sticky top-[72px] z-40 shadow-lg">
+        <div class="container-wide">
+          <div class="flex gap-2 overflow-x-auto">
+            <button class="nav-btn active" onclick="showModule('clientes')">
+              <i class="fas fa-users"></i>
+              <span>Clientes</span>
+            </button>
+            <button class="nav-btn" onclick="showModule('periodos')">
+              <i class="fas fa-calendar-alt"></i>
+              <span>Periodos</span>
+            </button>
+            <button class="nav-btn" onclick="showModule('consumos')">
+              <i class="fas fa-chart-line"></i>
+              <span>Consumos</span>
+            </button>
+            <button class="nav-btn" onclick="showModule('grupos')">
+              <i class="fas fa-layer-group"></i>
+              <span>Grupos de Facturación</span>
+            </button>
+            <button class="nav-btn" onclick="showModule('prorrateos')">
+              <i class="fas fa-calculator"></i>
+              <span>Prorrateos</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- CONTENIDO PRINCIPAL -->
+      <main class="container-wide py-8">
+        <!-- MÓDULO CLIENTES -->
+        <section id="mod-clientes" class="module-section">
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-3xl font-bold text-slate-800"><i class="fas fa-users text-blue-600 mr-3"></i>Gestión de Clientes</h2>
+              <button onclick="openModal('modal-cliente')" class="btn-primary"><i class="fas fa-plus mr-2"></i>Nuevo Cliente</button>
+            </div>
+            <!-- ESTADÍSTICAS -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div class="stat-card">
+                <div class="stat-icon bg-blue-100 text-blue-600">
+                  <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-value" id="stat-total-clientes">0</div>
+                <div class="stat-label">Total Clientes</div>
+              </div>
+              <div class="stat-card success">
+                <div class="stat-icon bg-green-100 text-green-600">
+                  <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-value" id="stat-ocupados">0</div>
+                <div class="stat-label">Ocupados</div>
+              </div>
+              <div class="stat-card danger">
+                <div class="stat-icon bg-red-100 text-red-600">
+                  <i class="fas fa-times-circle"></i>
+                </div>
+                <div class="stat-value" id="stat-desocupados">0</div>
+                <div class="stat-label">Desocupados</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FILTROS DEL MÓDULO DE CLIENTES EN UNA FILA -->
+          <div class="bg-white p-4 rounded-xl shadow mb-4 flex flex-wrap items-center gap-4">
+            <!-- Campo unificado para búsqueda -->
+            <div class="relative flex-grow min-w-[200px] max-w-md flex-shrink">
+              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+              <input id="filtroGeneralClientes" type="text" placeholder="Código, Cliente, Admin, NIT..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" />
+            </div>
+
+            <!-- Bodega -->
+            <input id="filtroBodega" type="text" placeholder="Bodega" class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none min-w-[120px]" />
+
+            <!-- Local -->
+            <input id="filtroLocal" type="text" placeholder="Local" class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none min-w-[120px]" />
+
+            <!-- Estado -->
+            <select id="filtroEstado" class="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none min-w-[140px]">
+              <option value="">Estado</option>
+              <option value="Ocupado">Ocupado</option>
+              <option value="Desocupado">Desocupado</option>
+            </select>
+
+            <!-- Botón Limpiar -->
+            <button onclick="limpiarFiltrosClientes()" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-all flex items-center justify-center gap-2 font-semibold whitespace-nowrap">
+              <i class="fas fa-eraser"></i>
+              Limpiar
+            </button>
+          </div>
+
+          <!-- TABLA CLIENTES -->
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Bodega</th>
+                  <th>Local</th>
+                  <th>Nombre</th>
+                  <th>Administrador</th>
+                  <th>Dirección</th>
+                  <th>NIT</th>
+                  <th>Teléfono</th>
+                  <th>Factor Medida</th>
+                  <th>Consumo Prom.</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-clientes"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-center mt-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex items-center gap-4">
+              <div class="text-sm text-slate-600" id="info-paginacion-clientes">Mostrando 0 de 0 registros</div>
+              <button id="btn-export-clientes" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg transition-colors flex items-center shadow-sm text-sm"><i class="fas fa-file-excel mr-1"></i>Exportar todo</button>
+            </div>
+            <div class="flex gap-2" id="controles-paginacion-clientes">
+              <!-- Los botones se generarán dinámicamente -->
+            </div>
+          </div>
+
+          <!-- RESUMEN DE ESTADÍSTICAS DE CLIENTES -->
+          <div id="resumen-filtros-clientes" class="mt-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex flex-wrap gap-6 text-center">
+              <div class="flex-1 min-w-[120px]">
+                <div class="text-2xl font-bold text-blue-600" id="total-filtrados">0</div>
+                <div class="text-sm text-slate-600">Locales Filtrados</div>
+              </div>
+              <div class="flex-1 min-w-[120px]">
+                <div class="text-2xl font-bold text-green-600" id="total-ocupados">0</div>
+                <div class="text-sm text-slate-600">Ocupados</div>
+              </div>
+              <div class="flex-1 min-w-[120px]">
+                <div class="text-2xl font-bold text-red-600" id="total-desocupados">0</div>
+                <div class="text-sm text-slate-600">Desocupados</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- MÓDULO PERIODOS -->
+        <section id="mod-periodos" class="module-section hidden">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-slate-800"><i class="fas fa-calendar-alt text-blue-600 mr-3"></i>Periodos de Consumo</h2>
+            <button onclick="openModal('modal-periodo')" class="btn-primary"><i class="fas fa-plus mr-2"></i>Nuevo Periodo</button>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Periodo (MMYYYY)</th>
+                  <th>% Contribución</th>
+                  <th>Costo Unitario (CU)</th>
+                  <th>Fecha Inicio</th>
+                  <th>Fecha Fin</th>
+                  <th>Días Facturados</th>
+                  <th>Consumo Total</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-periodos"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- MÓDULO CONSUMOS -->
+        <section id="mod-consumos" class="module-section hidden">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-slate-800"><i class="fas fa-chart-line text-blue-600 mr-3"></i>Registro de Consumos</h2>
+            <button onclick="openModal('modal-consumo')" class="btn-primary"><i class="fas fa-plus mr-2"></i>Nuevo Consumo</button>
+          </div>
+
+          <!-- FILTROS -->
+          <div class="bg-white p-6 rounded-xl shadow-md mb-6 border border-slate-200">
+            <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fas fa-filter text-blue-600 mr-2"></i>Filtros</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Periodo</label>
+                <select id="filtro-periodo-consumo" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Código</label>
+                <input type="text" id="filtro-codigo" placeholder="Buscar..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Bodega</label>
+                <input type="text" id="filtro-bodega" placeholder="Buscar..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Local</label>
+                <input type="text" id="filtro-local" placeholder="Buscar..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Cliente</label>
+                <input type="text" id="filtro-cliente" placeholder="Buscar..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Estado</label>
+                <select id="filtro-estado" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  <option value="">Todos</option>
+                  <option value="Ocupado">Ocupado</option>
+                  <option value="Desocupado">Desocupado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Periodo</th>
+                  <th>Código</th>
+                  <th>Bodega</th>
+                  <th>Local</th>
+                  <th>Cliente</th>
+                  <th>Estado</th>
+                  <th>Lectura Actual</th>
+                  <th>Consumo [kWh]</th>
+                  <th>Valor Facturado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-consumos"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-center mt-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex items-center gap-4">
+              <div class="text-sm text-slate-600" id="info-paginacion-consumos">Mostrando 0 de 0 registros</div>
+              <button id="btn-export-consumos" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg transition-colors flex items-center shadow-sm text-sm"><i class="fas fa-file-excel mr-1"></i>Exportar Periodo</button>
+            </div>
+            <div class="flex gap-2" id="controles-paginacion-consumos">
+              <!-- Los botones se generarán dinámicamente -->
+            </div>
+          </div>
+        </section>
+
+        <!-- MÓDULO GRUPOS DE FACTURACIÓN -->
+        <section id="mod-grupos" class="module-section hidden">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-slate-800"><i class="fas fa-users text-blue-600 mr-3"></i>Gestión de Clientes</h2>
+            <button onclick="openModal('modal-grupo')" class="btn-primary"><i class="fas fa-plus mr-2"></i>Nuevo Grupo</button>
+          </div>
+
+          <!-- FILTROS -->
+          <div class="bg-white p-6 rounded-xl shadow-md mb-6 border border-slate-200">
+            <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fas fa-filter text-blue-600 mr-2"></i>Filtros</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-2">Periodo</label>
+                <select id="filtro-grupos" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+                <tr>
+                  <th class="p-4">Periodo</th>
+                  <th class="p-4">Título</th>
+                  <th class="p-4">Clientes</th>
+                  <th class="p-4">Consumo Total</th>
+                  <th class="p-4">Total Facturado</th>
+                  <th class="p-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-grupos-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- MÓDULO PRORRATEOS -->
+        <section id="mod-prorrateos" class="module-section hidden">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-slate-800"><i class="fas fa-calculator text-blue-600 mr-3"></i>Prorrateos de Energía</h2>
+            <button onclick="openModal('modal-prorrateo')" class="btn-primary"><i class="fas fa-plus mr-2"></i>Nuevo Prorrateo</button>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Bodega</th>
+                  <th>Local</th>
+                  <th>Cliente</th>
+                  <th>Fecha Inicio</th>
+                  <th>Fecha Entrega</th>
+                  <th>Lectura Anterior</th>
+                  <th>Lectura Actual</th>
+                  <th>% Contribución</th>
+                  <th>Valor Unitario (CU)</th>
+                  <th>Valor Total</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-prorrateos"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- MODAL CONSULTA PÚBLICA -->
+    <div id="modal-publico" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-search text-blue-600 mr-2"></i>Consulta Pública de Consumo</h3>
+            <button onclick="closeModal('modal-publico')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- IZQUIERDA: INFO CLIENTE -->
+          <div class="space-y-3">
+            <h4 class="text-lg font-semibold text-slate-700">Información del Cliente</h4>
+            <div class="bg-slate-50 p-4 rounded-lg shadow-sm">
+              <div class="text-sm text-slate-600"><strong>Código:</strong> <span id="public-codigo">-</span></div>
+              <div class="text-sm text-slate-600"><strong>Cliente:</strong> <span id="public-nombre">-</span></div>
+              <div class="text-sm text-slate-600"><strong>Bodega:</strong> <span id="public-bodega">-</span></div>
+              <div class="text-sm text-slate-600"><strong>Local:</strong> <span id="public-local">-</span></div>
+              <div class="text-sm text-slate-600"><strong>Administrador:</strong> <span id="public-administrador">-</span></div>
+              <div class="text-sm text-slate-600"><strong>NIT:</strong> <span id="public-nit">-</span></div>
+              <div class="text-sm text-slate-600"><strong>Teléfono:</strong> <span id="public-telefono">-</span></div>
+            </div>
+
+            <div>
+              <h4 class="text-lg font-semibold text-slate-700 mt-4">Facturación</h4>
+              <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                <label class="block text-sm text-slate-600 mb-2">Seleccione un periodo</label>
+                <select id="public-periodo-select" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- Seleccionar periodo --</option>
+                </select>
+
+                <div id="public-facturacion-detalle" class="mt-4 text-sm text-slate-700">
+                  <!-- Aquí se mostrará detalle cuando se seleccione periodo -->
+                  <div class="text-slate-500">Seleccione un periodo para ver el detalle de facturación.</div>
+                </div>
+
+                <div id="public-prorrateos-list" class="mt-4"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DERECHA: GRÁFICO CON ÚLTIMOS CONSUMOS -->
+          <div>
+            <h4 class="text-lg font-semibold text-slate-700">Últimos Consumos (máx. 6)</h4>
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+              <canvas id="chart-consumos-publico" width="400" height="300"></canvas>
+            </div>
+
+            <div class="mt-4 text-xs text-slate-500">Si no hay registros, se mostrará un mensaje indicando que no existen consumos para el código ingresado.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL GRUPOS DE FACTURACIÓN -->
+    <div id="modal-grupo" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto m-4">
+        <header class="flex justify-between items-center border-b px-6 py-4">
+          <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-layer-group text-blue-600 mr-2"></i>Registrar Grupo de Facturación</h3>
+          <button onclick="closeModal('modal-grupo')" class="text-slate-400 hover:text-slate-600 text-2xl">
+            <i class="fas fa-times"></i>
+          </button>
+        </header>
+
+        <form id="form-grupo" class="px-8 py-6 space-y-6">
+          <input type="hidden" id="grupo-id" />
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="grupo-periodo" class="block text-sm font-medium text-gray-700 mb-2">Periodo</label>
+              <select id="grupo-periodo" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" required>
+                <!-- Opciones cargadas dinámicamente -->
+              </select>
+            </div>
+
+            <div>
+              <label for="grupo-titulo-input" class="block text-sm font-medium text-gray-700 mb-2">Título del Grupo</label>
+              <input type="text" id="grupo-titulo-input" placeholder="Ej: Facturación Especial Bodega 1" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" required />
+            </div>
+          </div>
+
+          <section>
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">Agregar clientes al grupo:</h4>
+
+            <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mb-6">
+              <div class="relative flex-1">
+                <input type="text" id="buscar-cliente-grupo" placeholder="Buscar por código..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none" autocomplete="off" />
+                <div id="sugerencias-cliente-grupo" class="absolute z-20 w-full bg-white border border-t-0 rounded-b-lg shadow-lg max-h-48 overflow-y-auto hidden"></div>
+              </div>
+              <button type="button" onclick="agregarClienteAGrupo()" class="mt-3 sm:mt-0 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors flex items-center justify-center"><i class="fas fa-plus mr-2"></i> Agregar</button>
+            </div>
+
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Consumo (kWh)</th>
+                    <th>Valor (COP)</th>
+                    <th class="text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="lista-clientes-grupo-body"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2" class="px-4 py-3 text-right">TOTALES:</td>
+                    <td id="total-consumo-grupo" class="px-4 py-3">0.00</td>
+                    <td id="total-facturado-grupo" class="px-4 py-3">$ 0</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+          <div class="flex gap-4 mt-8">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"><i class="fas fa-save mr-2"></i>Guardar Grupo</button>
+            <button type="button" onclick="closeModal('modal-cliente')" class="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-300 transition-all"><i class="fas fa-times mr-2"></i>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL CLIENTE -->
+    <div id="modal-cliente" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-user-plus text-blue-600 mr-2"></i>Gestionar Cliente</h3>
+            <button onclick="closeModal('modal-cliente')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <form id="form-cliente" class="p-8">
+          <input type="hidden" id="cliente-id" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Código *</label>
+              <input type="text" id="cli-codigo" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Bodega *</label>
+              <input type="text" id="cli-bodega" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Local *</label>
+              <input type="text" id="cli-local" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <!-- Campo de Nombre del Cliente con Autocompletado -->
+            <div class="relative">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Nombre del Cliente</label>
+              <input type="text" id="cli-nombre" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ingrese o busque el nombre del cliente" />
+              <!-- Lista de sugerencias para clientes -->
+              <div id="suggestions-clientes" class="absolute z-10 w-full bg-white border border-slate-300 rounded-lg shadow-lg mt-1 hidden max-h-48 overflow-y-auto"></div>
+            </div>
+            <!-- Campo de Administrador con Autocompletado -->
+            <div class="relative">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Administrador</label>
+              <input type="text" id="cli-administrador" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ingrese o busque el nombre del administrador" />
+              <!-- Lista de sugerencias para administradores -->
+              <div id="suggestions-admins" class="absolute z-10 w-full bg-white border border-slate-300 rounded-lg shadow-lg mt-1 hidden max-h-48 overflow-y-auto"></div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Dirección</label>
+              <input type="text" id="cli-direccion" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <!-- Campo de NIT (se actualizará automáticamente) -->
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">NIT</label>
+              <input type="text" id="cli-nit" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="NIT del cliente" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Teléfono</label>
+              <input type="text" id="cli-telefono" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Factor de Medida *</label>
+              <input type="number" id="cli-factor" step="0.01" value="1" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Estado *</label>
+              <select id="cli-estado" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                <option value="Ocupado">Ocupado</option>
+                <option value="Desocupado">Desocupado</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex gap-4 mt-8">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"><i class="fas fa-save mr-2"></i>Guardar Cliente</button>
+            <button type="button" onclick="closeModal('modal-cliente')" class="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-300 transition-all"><i class="fas fa-times mr-2"></i>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL PERIODO -->
+    <div id="modal-periodo" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-2xl m-4">
+        <div class="bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-calendar-plus text-blue-600 mr-2"></i>Gestionar Periodo</h3>
+            <button onclick="closeModal('modal-periodo')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <form id="form-periodo" class="p-8">
+          <input type="hidden" id="periodo-id" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Mes *</label>
+              <select id="per-mes" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Año *</label>
+              <input type="number" id="per-anio" min="2020" max="2100" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">% Contribución *</label>
+              <input type="number" id="per-contribucion" step="0.0001" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Costo Unitario (CU) *</label>
+              <input type="number" id="per-costo" step="0.0001" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio *</label>
+              <input type="date" id="per-fecha-inicio" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Fin *</label>
+              <input type="date" id="per-fecha-fin" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+          </div>
+          <div class="flex gap-4 mt-8">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"><i class="fas fa-save mr-2"></i>Guardar Periodo</button>
+            <button type="button" onclick="closeModal('modal-periodo')" class="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-300 transition-all"><i class="fas fa-times mr-2"></i>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL CONSUMO -->
+    <div id="modal-consumo" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-bolt text-blue-600 mr-2"></i>Registrar Consumo</h3>
+            <button onclick="closeModal('modal-consumo')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <form id="form-consumo" class="p-8">
+          <input type="hidden" id="consumo-id" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Periodo *</label>
+              <select id="con-periodo" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                <option value="">Seleccionar Periodo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Código Cliente *</label>
+              <input type="text" id="con-codigo" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Bodega</label>
+              <input type="text" id="con-bodega" readonly class="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Local</label>
+              <input type="text" id="con-local" readonly class="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Cliente</label>
+              <input type="text" id="con-cliente" readonly class="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Estado</label>
+              <input type="text" id="con-estado" readonly class="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Lectura Anterior *</label>
+              <input type="number" id="con-lectura-anterior" step="0.00001" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Lectura Actual *</label>
+              <input type="number" id="con-lectura-actual" step="0.00001" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Impuesto de Seguridad</label>
+              <input type="number" id="con-impuesto" step="0.0001" value="0" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Otros Conceptos</label>
+              <input type="number" id="con-otros" step="0.0001" value="0" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="con-ajustar-multiplo" class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
+              <label for="con-ajustar-multiplo" class="text-sm font-medium text-slate-700">Ajustar valor facturado a múltiplos de 10</label>
+            </div>
+          </div>
+
+          <!-- Botones del Modal de Consumo -->
+          <div class="flex gap-4 mt-8">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"><i class="fas fa-save mr-2"></i>Guardar Consumo</button>
+            <button type="button" onclick="guardarYRegistrarOtro()" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-all"><i class="fas fa-plus-circle mr-2"></i>Guardar y Continuar</button>
+            <button type="button" onclick="closeModal('modal-consumo')" class="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-300 transition-all"><i class="fas fa-times mr-2"></i>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL PRORRATEO -->
+    <div id="modal-prorrateo" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-calculator text-blue-600 mr-2"></i>Calcular Prorrateo</h3>
+            <button onclick="closeModal('modal-prorrateo')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <form id="form-prorrateo" class="p-8">
+          <input type="hidden" id="prorrateo-id" />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Código Cliente *</label>
+              <input type="text" id="pro-codigo" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Inicio *</label>
+              <input type="date" id="pro-fecha-inicio" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha Entrega *</label>
+              <input type="date" id="pro-fecha-entrega" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Lectura Anterior *</label>
+              <input type="number" id="pro-lectura-anterior" step="0.01" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Lectura Actual *</label>
+              <input type="number" id="pro-lectura-actual" step="0.01" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Impuesto de Seguridad *</label>
+              <input type="number" id="pro-impuesto" step="0.0001" value="0" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Valor Unitario (CU) Manual</label>
+              <input type="number" id="pro-cu-manual" step="0.0001" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Dejar vacío para usar último periodo" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">% Contribución Manual</label>
+              <input type="number" id="pro-contribucion-manual" step="0.0001" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Dejar vacío para usar último periodo" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Otros Conceptos</label>
+              <input type="number" id="pro-otros" step="0.0001" value="0" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+            </div>
+          </div>
+          <div class="flex gap-4 mt-8">
+            <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"><i class="fas fa-save mr-2"></i>Guardar Prorrateo</button>
+            <button type="button" onclick="closeModal('modal-prorrateo')" class="flex-1 bg-slate-200 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-300 transition-all"><i class="fas fa-times mr-2"></i>Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL CONFIGURACIÓN -->
+    <div id="modal-config" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+      <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl m-4">
+        <div class="bg-white border-b border-slate-200 px-8 py-6 rounded-t-2xl">
+          <div class="flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-slate-800"><i class="fas fa-cog text-blue-600 mr-2"></i>Configuración del Sistema</h3>
+            <button onclick="closeModal('modal-config')" class="text-slate-400 hover:text-slate-600 text-2xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+          <!-- COLUMNA IZQUIERDA: CREDENCIALES -->
+          <form id="form-config-auth" class="space-y-4 border-r border-slate-100 pr-10">
+            <h4 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Cambio de Credenciales</h4>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Nuevo Usuario</label>
+              <input type="text" id="config-username" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Dejar en blanco para no cambiar" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Nueva Contraseña</label>
+              <input type="password" id="config-password" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Dejar en blanco para no cambiar" />
+            </div>
+            <div class="pt-4">
+              <label class="block text-sm font-bold text-red-600 mb-1">Contraseña Actual *</label>
+              <input type="password" id="config-current-password" required class="w-full px-4 py-2 border-2 border-red-100 rounded-lg focus:ring-2 focus:ring-red-500 outline-none" />
+              <p class="text-xs text-slate-500 mt-1">Requerida para aplicar cambios de acceso.</p>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all">Actualizar Acceso</button>
+          </form>
+
+          <!-- COLUMNA DERECHA: DATOS POR DEFECTO -->
+          <form id="form-config-defaults" class="space-y-4">
+            <h4 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Locales Desocupados</h4>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Cliente por Defecto</label>
+              <input type="text" id="config-default-cliente" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Administrador por Defecto</label>
+              <input type="text" id="config-default-admin" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">NIT por Defecto</label>
+              <input type="text" id="config-default-nit" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Teléfono por Defecto</label>
+              <input type="text" id="config-default-telefono" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <button type="submit" class="w-full bg-slate-700 text-white py-2 rounded-lg font-semibold hover:bg-slate-800 transition-all">Guardar Valores</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
